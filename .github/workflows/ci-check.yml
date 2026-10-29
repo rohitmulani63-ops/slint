@@ -23,8 +23,13 @@ jobs:
           components: rustfmt, clippy
       - name: cargo fmt
         run: cargo fmt --all -- --check
-      - name: clippy i-slint-core (all features, as in scripts/run_clippy.sh)
-        run: cargo clippy --locked -p i-slint-core --all-targets --all-features -- -D warnings
+      - name: clippy i-slint-core lib (all features, strict)
+        run: cargo clippy --locked -p i-slint-core --lib --all-features -- -D warnings
+      # i-slint-backend-testing (a dev-dependency) trips clippy::needless_update when built
+      # alone, because a TestingBackendOptions field only exists with cfg(supports_headless).
+      # Upstream lints the whole workspace, so it never shows there. Allow only that lint.
+      - name: clippy i-slint-core all targets (all features)
+        run: cargo clippy --locked -p i-slint-core --all-targets --all-features -- -D warnings -A clippy::needless_update
       - name: test i-slint-core (default features)
         run: cargo test --locked -p i-slint-core
       - name: test i-slint-core (all features)
