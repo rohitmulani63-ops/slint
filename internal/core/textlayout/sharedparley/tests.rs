@@ -354,6 +354,7 @@ fn test_elide_left_to_right_line() {
     let (glyphs, ellipsis) = &runs[0];
     let (ellipsis_start, ellipsis_end) = ellipsis.expect("the line overflows");
     assert!(ellipsis_end <= 100.);
+    assert!(!glyphs.is_empty());
     assert!(glyphs.iter().all(|&(start, end)| start >= 0. && end <= ellipsis_start));
 }
 
@@ -377,9 +378,18 @@ fn test_elide_right_to_left_line() {
             glyphs.iter().all(|&&(start, end)| start >= ellipsis_end - 0.01 && end <= 100.01),
             "glyphs outside the box or under the ellipsis: {glyphs:?}"
         );
-        // The kept text still starts at the right edge.
+        let left = glyphs.iter().map(|&&(start, _)| start).fold(f32::MAX, f32::min);
+        assert!(
+            left - ellipsis_end < 0.01,
+            "the ellipsis ends at {ellipsis_end}, not at the first kept glyph at {left}"
+        );
+        let max_advance = glyphs.iter().map(|&&(start, end)| end - start).fold(0., f32::max);
+        assert!(
+            ellipsis_start < max_advance + 0.01,
+            "more than one glyph was cut before the ellipsis at {ellipsis_start}"
+        );
         let right = glyphs.iter().map(|&&(_, end)| end).fold(f32::MIN, f32::max);
-        assert!(right > 99., "{text:?} ends at {right}");
+        assert!(right > 99., "the kept text of {text:?} ends at {right}, not at the right edge");
     }
 }
 

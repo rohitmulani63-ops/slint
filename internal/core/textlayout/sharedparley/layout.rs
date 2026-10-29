@@ -573,7 +573,7 @@ impl Layout {
         } else {
             (run_start > max_width, run_end.get().floor() > max_width.get().ceil())
         };
-        // Run extends beyond max width (or the lines below it were dropped) and needs an ellipsis
+        // Run overflows the box (or the lines below it were dropped) and needs an ellipsis
         let needs_elision = !run_beyond_elision && (force_elision || run_overflows);
         let cut_left = needs_elision && is_rtl;
         let cut_right = needs_elision && !is_rtl;
