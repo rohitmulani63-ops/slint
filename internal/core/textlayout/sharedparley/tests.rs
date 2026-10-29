@@ -363,7 +363,9 @@ fn test_elide_right_to_left_line() {
     // The right-to-left mark makes a paragraph of Latin text right-to-left, like a file name that
     // starts with Arabic and ends in ".docx". The test font has no Hebrew, so those glyphs are
     // missing-glyph boxes, which still have an advance.
-    for text in ["\u{5d0}\u{5d1}\u{5d2} ".repeat(20), format!("\u{200f}{}", "abc ".repeat(20))] {
+    for text in
+        ["\u{5d0}\u{5d1}\u{5d2} ".repeat(20), alloc::format!("\u{200f}{}", "abc ".repeat(20))]
+    {
         let runs = elided_line(&text);
         let ellipses: Vec<_> = runs.iter().filter_map(|(_, ellipsis)| *ellipsis).collect();
         assert_eq!(ellipses.len(), 1, "expected one ellipsis on the line of {text:?}");
