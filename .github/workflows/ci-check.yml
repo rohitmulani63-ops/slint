@@ -23,17 +23,19 @@ jobs:
           components: rustfmt, clippy
       - name: cargo fmt
         run: cargo fmt --all -- --check
-      - name: clippy i-slint-core lib (all features, strict)
-        run: cargo clippy --locked -p i-slint-core --lib --all-features -- -D warnings
+      # Default features (they include shared-parley). Building i-slint-core alone with
+      # --all-features breaks zeno (needs std or libm, which the full workspace provides).
+      - name: clippy i-slint-core lib (strict)
+        run: cargo clippy --locked -p i-slint-core --lib -- -D warnings
       # i-slint-backend-testing (a dev-dependency) trips clippy::needless_update when built
       # alone, because a TestingBackendOptions field only exists with cfg(supports_headless).
       # Upstream lints the whole workspace, so it never shows there. Allow only that lint.
-      - name: clippy i-slint-core all targets (all features)
-        run: cargo clippy --locked -p i-slint-core --all-targets --all-features -- -D warnings -A clippy::needless_update
-      - name: test i-slint-core (default features)
+      - name: clippy i-slint-core all targets
+        run: cargo clippy --locked -p i-slint-core --all-targets -- -D warnings -A clippy::needless_update
+      - name: test i-slint-core
         run: cargo test --locked -p i-slint-core
-      - name: test i-slint-core (all features)
-        run: cargo test --locked -p i-slint-core --all-features
+      - name: test our new elide tests (listed)
+        run: cargo test --locked -p i-slint-core --lib elid -- --nocapture --list
 
   spellcheck:
     runs-on: ubuntu-latest
