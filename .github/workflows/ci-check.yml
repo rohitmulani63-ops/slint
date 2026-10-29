@@ -1,0 +1,40 @@
+name: CI check (fork only)
+
+on:
+  push:
+    branches:
+      - ci-check-elide-rtl
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: false
+  RUSTFLAGS: -D warnings
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/install-linux-dependencies
+      - uses: ./.github/actions/setup-rust
+        with:
+          components: rustfmt, clippy
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+      - name: clippy i-slint-core (default features)
+        run: cargo clippy --locked -p i-slint-core --all-targets -- -D warnings
+      - name: clippy i-slint-core (all features)
+        run: cargo clippy --locked -p i-slint-core --all-targets --all-features -- -D warnings
+      - name: test i-slint-core (default features)
+        run: cargo test --locked -p i-slint-core
+      - name: test i-slint-core (all features)
+        run: cargo test --locked -p i-slint-core --all-features
+
+  spellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: cspell on the changed files
+        run: npx --yes cspell@10.4.0 --no-progress internal/core/textlayout/sharedparley/draw.rs internal/core/textlayout/sharedparley/layout.rs internal/core/textlayout/sharedparley/tests.rs
