@@ -1,0 +1,110 @@
+# Temporary, fork-only. Never part of a pull request.
+name: CI check 14856 (fork only)
+
+on:
+  push:
+    branches:
+      - ci-check-14856
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-check-14856
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: false
+  CARGO_PROFILE_DEV_DEBUG: 0
+  RUSTFLAGS: -D warnings
+  RUST_BACKTRACE: 1
+  SLINT_NO_QT: 1
+
+jobs:
+  # The branch as it is: the fix and both new tests. Everything must pass.
+  with_fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-linux-dependencies
+      - uses: ./.github/actions/setup-rust
+        with:
+          components: rustfmt, clippy
+          cache: "false"
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+      # Same flags as scripts/run_clippy.sh, for the one crate the fix touches.
+      - name: clippy i-slint-compiler
+        run: cargo clippy --locked --all-features -p i-slint-compiler -- -D warnings
+      - name: all compiler syntax tests
+        run: cargo test --locked -p i-slint-compiler --features display-diagnostics --test syntax_tests
+      - name: popup cases, interpreter driver
+        env:
+          SLINT_TEST_FILTER: popup
+        run: cargo test --locked --manifest-path tests/Cargo.toml -p test-driver-interpreter
+      - name: popup cases, rust driver (build-time, as CI does)
+        env:
+          SLINT_TEST_FILTER: popup
+        run: cargo test --locked --manifest-path tests/Cargo.toml -p test-driver-rust --features build-time
+
+  # The same tree with only lower_popups.rs put back to the base commit.
+  # The two new tests must FAIL here; the job is green only when they do.
+  without_fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 3
+      - name: put lower_popups.rs back to the base commit
+        run: |
+          git checkout b30d692051bb4e54c560200c15f7c42a2f2c0759 -- internal/compiler/passes/lower_popups.rs
+          git status --short
+          if grep -nF "lowered.insert" internal/compiler/passes/lower_popups.rs; then
+            echo "the fix is still in the file"
+            exit 1
+          fi
+      - uses: ./.github/actions/install-linux-dependencies
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache: "false"
+      - name: build the syntax tests (must build)
+        run: cargo test --locked -p i-slint-compiler --features display-diagnostics --test syntax_tests --no-run
+      - name: new syntax test must fail without the fix
+        env:
+          SLINT_TEST_FILTER: issue_14856
+        run: |
+          set +e
+          cargo test --locked -p i-slint-compiler --features display-diagnostics --test syntax_tests > out.txt 2>&1
+          status=$?
+          set -e
+          cat out.txt
+          if [ "$status" = 0 ]; then
+            echo "UNEXPECTED: the new syntax test passed without the fix"
+            exit 1
+          fi
+          grep -F "cannot be directly repeated or conditional" out.txt || echo "NOTE: the error text is not in the output"
+          echo "OK: the new syntax test fails without the fix"
+      - name: build the interpreter driver (must build)
+        env:
+          SLINT_TEST_FILTER: popupwindow_inherits_in_repeater
+        run: cargo test --locked --manifest-path tests/Cargo.toml -p test-driver-interpreter --no-run
+      - name: new popup case must fail without the fix
+        env:
+          SLINT_TEST_FILTER: popupwindow_inherits_in_repeater
+        run: |
+          set +e
+          cargo test --locked --manifest-path tests/Cargo.toml -p test-driver-interpreter > out.txt 2>&1
+          status=$?
+          set -e
+          cat out.txt
+          if [ "$status" = 0 ]; then
+            echo "UNEXPECTED: the new popup case passed without the fix"
+            exit 1
+          fi
+          grep -F "cannot be directly repeated or conditional" out.txt || echo "NOTE: the error text is not in the output"
+          echo "OK: the new popup case fails without the fix"
